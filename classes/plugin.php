@@ -492,33 +492,36 @@ class CWS_WP_Help_Plugin {
 		die( json_encode( $this->get_topics_for_api() ) );
 	}
 
-	public function convert_links_cb( $matches ) {
-		if ( preg_match( '#page=wp-help-documents&(amp;)?document=([0-9]+)#', $matches[2], $url ) ) {
-			return 'href=' . $matches[1] . 'http://wp-help-link/' . $url[2] . $matches[1];
-		}
-		return $matches[0];
-	}
-
-	protected function convert_links( $content ) {
-		$content = preg_replace_callback( '#href=(["\'])([^\\1]+)\\1#', array( $this, 'convert_links_cb' ), $content );
-		$admin_url = parse_url( admin_url( '/' ) );
-		$content = preg_replace( '#(https?)://' . preg_quote( $admin_url['host'] . $admin_url['path'], '#' ) . '#', '', $content );
+	private function convert_links($content) {
+		$content = preg_replace_callback(
+			'/href="[A-z0-9":\/.\-_\?=]*&[amp;]*document=([0-9]+)"/',
+			function($matches) {
+				return 'href="http://wp-help-link/' . $matches[1] . '"';
+			}, $content);
+		$admin_url = parse_url(admin_url('/'));
+		$content = preg_replace('#(https?)://' . preg_quote($admin_url['host'] . $admin_url['path'], '#') . '#', '', $content);
 		return $content;
 	}
 
 	public function make_links_local_cb( $matches ) {
-		$local_id = $this->local_id_from_slurp_id( $matches[2] );
-		if ( $local_id ) {
-			return 'href=' . $matches[1] . get_permalink( absint( $local_id ) ) . $matches[1];
+		$local_id = $this->local_id_from_slurp_id( absint($matches[1]) );
+		if ($local_id) {
+			return 'href="' . get_permalink(absint($local_id)) . '"';
+		} else {
+			return $matches[0];
 		}
-		return $matches[0];
 	}
 
-	protected function make_links_local( $content ) {
-		return preg_replace_callback( '#href=(["\'])http://wp-help-link/([0-9]+)\\1#', array( $this, 'make_links_local_cb' ), $content );
+	private function make_links_local($content) {
+		$output = preg_replace_callback(
+			'/href="http:\/\/wp-help-link\/([0-9]+)"/',
+			array($this, 'make_links_local_cb'),
+			$content
+		);
+		return $output;
 	}
 
-	protected function local_id_from_slurp_id( $id ) {
+	public function local_id_from_slurp_id( $id ) {
 		if ( ! $id ) {
 			return false;
 		}
